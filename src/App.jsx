@@ -8,7 +8,35 @@ const saved=()=>{try{return JSON.parse(localStorage.getItem('mafia-session')||'n
 export default function App(){
  const [session,setSession]=useState(saved),[room,setRoom]=useState(null),[name,setName]=useState(''),[code,setCode]=useState(new URLSearchParams(location.search).get('room')||''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[chatText,setChatText]=useState('');
  const [tab,setTab]=useState('game');
- const call=async(action,extra={})=>{if(!supabase)throw Error('Add your Supabase URL and anon key to the .env file first.');const{data,error}=await supabase.functions.invoke('mafia',{body:{action,...extra, ...(session?{roomCode:session.roomCode,playerId:session.playerId,token:session.token}:{})}});if(error)throw error;if(!data?.ok)throw Error(data?.error||'Something went wrong.');return data;};
+ const call = async (action, extra = {}) => {
+  if (!supabase) {
+    throw new Error('Supabase configuration is missing.');
+  }
+
+  const response = await fetch('/api/mafia', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      action,
+      ...extra,
+      ...(session ? {
+        roomCode: session.roomCode,
+        playerId: session.playerId,
+        token: session.token,
+      } : {}),
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || 'Something went wrong.');
+  }
+
+  return data;
+};
  const refresh=async()=>{if(!session)return;try{const d=await call('state');setRoom(d.room)}catch(e){setError(e.message)}};
  useEffect(()=>{if(session){refresh();const t=setInterval(refresh,2500);return()=>clearInterval(t)}},[session?.token]);
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();if(d?.room)setRoom(d.room);if(d?.session){localStorage.setItem('mafia-session',JSON.stringify(d.session));setSession(d.session)}if(d?.message)setNotice(d.message)}catch(e){setError(e.message||'Request failed')}finally{setBusy(false)}};
